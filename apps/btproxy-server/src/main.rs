@@ -13,6 +13,12 @@ use tracing::{info, warn};
 async fn main() -> Result<()> {
     let cfg = ServerConfig::parse();
     init_tracing(&cfg.log);
+    info!(
+        channel = cfg.channel,
+        clash_socks = %cfg.clash_socks,
+        direct = cfg.direct,
+        "starting btproxy server"
+    );
 
     let link_cfg = BtLinkConfig::default();
     #[cfg(target_os = "linux")]
@@ -36,6 +42,7 @@ async fn main() -> Result<()> {
     info!("server ready");
     loop {
         if let Some((target, stream)) = session.accept_stream().await {
+            info!(?target, stream_id = stream.stream_id, "accepted mux stream");
             let session = session.clone();
             let cfg = cfg.clone();
             tokio::spawn(async move {
@@ -54,6 +61,13 @@ async fn handle_stream(
     mux_stream: mux::MuxStream,
 ) -> Result<()> {
     let (host, port) = target_to_host_port(&target)?;
+    info!(
+        stream_id = mux_stream.stream_id,
+        %host,
+        port,
+        direct = cfg.direct,
+        "opening outbound connection"
+    );
     let outbound = if cfg.direct {
         TcpStream::connect(format!("{}:{}", host, port)).await?
     } else {
@@ -68,6 +82,7 @@ async fn handle_stream(
     };
 
     session.send_open_ok(mux_stream.stream_id).await.ok();
+    info!(stream_id = mux_stream.stream_id, "proxying stream");
     proxy_streams(outbound, mux_stream).await?;
     Ok(())
 }
