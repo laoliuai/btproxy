@@ -1,0 +1,16 @@
+[package]
+name = "btproxy-server"
+version = "0.1.0"
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+bytes.workspace = true
+btlink = { path = "../../crates/btlink" }
+common = { path = "../../crates/common" }
+clap.workspace = true
+mux = { path = "../../crates/mux" }
+socks5 = { path = "../../crates/socks5" }
+tokio.workspace = true
+tracing.workspace = true

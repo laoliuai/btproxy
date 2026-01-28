@@ -1,0 +1,30 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/common",
+  "crates/btlink",
+  "crates/mux",
+  "crates/socks5",
+  "crates/proxy_http",
+  "apps/btproxy-client",
+  "apps/btproxy-server",
+]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+
+[workspace.dependencies]
+anyhow = "1"
+bytes = "1"
+clap = { version = "4", features = ["derive"] }
+httparse = "1"
+thiserror = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-util = { version = "0.7", features = ["codec"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+url = "2"
+sha2 = "0.10"
+hmac = "0.12"
+rand = "0.8"
