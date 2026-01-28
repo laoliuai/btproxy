@@ -50,7 +50,7 @@ fn parse_bt_addr(addr: &str) -> Result<u64> {
     }
     let mut bytes = [0u8; 6];
     for (idx, part) in parts.iter().enumerate() {
-        bytes[5 - idx] = u8::from_str_radix(part, 16)
+        bytes[idx] = u8::from_str_radix(part, 16)
             .map_err(|_| BtProxyError::Config("invalid bt addr".to_string()))?;
     }
     let mut value: u64 = 0;
