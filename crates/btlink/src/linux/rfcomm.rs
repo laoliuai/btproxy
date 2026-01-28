@@ -50,6 +50,7 @@ pub async fn connect_linux_rfcomm(addr: &str, channel: u8, cfg: BtLinkConfig) ->
         rc_bdaddr: bdaddr,
         rc_channel: channel,
     };
+    info!(bt_addr = %addr, channel, "connecting rfcomm");
     let ret = unsafe {
         libc::connect(
             fd,
@@ -71,6 +72,7 @@ pub async fn accept_linux_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtLin
         rc_bdaddr: [0; 6],
         rc_channel: channel,
     };
+    info!(channel, "rfcomm listening");
     let ret = unsafe {
         libc::bind(
             fd,
@@ -88,6 +90,7 @@ pub async fn accept_linux_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtLin
     if client_fd < 0 {
         return Err(BtProxyError::Io(io::Error::last_os_error()));
     }
+    info!("rfcomm accepted client");
     Ok(BtLink::spawn(file_from_fd(client_fd), cfg)?)
 }
 

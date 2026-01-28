@@ -11,6 +11,13 @@ use tracing::{error, info};
 async fn main() -> Result<()> {
     let cfg = ClientConfig::parse();
     init_tracing(&cfg.log);
+    info!(
+        bt_addr = %cfg.bt_addr,
+        channel = cfg.channel,
+        uuid = cfg.uuid.as_deref().unwrap_or(""),
+        listen = %cfg.listen,
+        "starting btproxy client"
+    );
 
     let mut backoff = Backoff::new(1000, 30_000);
     loop {
@@ -44,6 +51,7 @@ async fn connect_session(cfg: &ClientConfig) -> Result<MuxSession> {
 
     #[cfg(target_os = "windows")]
     let link = {
+        info!("attempting rfcomm connection");
         btlink::connect_windows_rfcomm(&cfg.bt_addr, cfg.uuid.as_deref(), cfg.channel, link_cfg)
             .await?
     };

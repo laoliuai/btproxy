@@ -4,6 +4,7 @@ use std::io;
 use std::net::TcpStream;
 use std::os::windows::io::{FromRawSocket, RawSocket};
 use std::sync::OnceLock;
+use tracing::info;
 use windows_sys::core::GUID;
 use windows_sys::Win32::Devices::Bluetooth::{AF_BTH, BTHPROTO_RFCOMM, SOCKADDR_BTH};
 use windows_sys::Win32::Networking::WinSock::{
@@ -47,10 +48,13 @@ fn parse_bt_addr(addr: &str) -> Result<u64> {
     if parts.len() != 6 {
         return Err(BtProxyError::Config("invalid bt addr".to_string()));
     }
-    let mut value: u64 = 0;
-    for part in parts {
-        let byte = u8::from_str_radix(part, 16)
+    let mut bytes = [0u8; 6];
+    for (idx, part) in parts.iter().enumerate() {
+        bytes[5 - idx] = u8::from_str_radix(part, 16)
             .map_err(|_| BtProxyError::Config("invalid bt addr".to_string()))?;
+    }
+    let mut value: u64 = 0;
+    for byte in bytes {
         value = (value << 8) | u64::from(byte);
     }
     Ok(value)
@@ -151,6 +155,12 @@ pub async fn connect_windows_rfcomm(
     if socket == INVALID_SOCKET {
         return Err(last_socket_error());
     }
+    info!(
+        bt_addr = %addr,
+        channel = channel.map(u32::from),
+        uuid = uuid.unwrap_or(""),
+        "connecting rfcomm"
+    );
     let ret = unsafe {
         connect(
             socket,
@@ -159,10 +169,12 @@ pub async fn connect_windows_rfcomm(
         )
     };
     if ret == SOCKET_ERROR {
+        let err = unsafe { WSAGetLastError() };
         close_socket(socket);
-        return Err(last_socket_error());
+        return Err(BtProxyError::Io(io::Error::from_raw_os_error(err)));
     }
     let stream = socket_stream(socket)?;
+    info!("rfcomm connected");
     Ok(BtLink::spawn(stream, cfg)?)
 }
 
@@ -172,6 +184,7 @@ pub async fn accept_windows_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtL
     if socket == INVALID_SOCKET {
         return Err(last_socket_error());
     }
+    info!(channel, "rfcomm listening");
     let sockaddr = SOCKADDR_BTH {
         addressFamily: AF_BTH as u16,
         btAddr: 0,
@@ -199,5 +212,6 @@ pub async fn accept_windows_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtL
         return Err(last_socket_error());
     }
     let stream = socket_stream(client_socket)?;
+    info!("rfcomm accepted client");
     Ok(BtLink::spawn(stream, cfg)?)
 }
