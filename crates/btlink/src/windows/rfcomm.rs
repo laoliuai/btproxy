@@ -5,10 +5,10 @@ use std::net::TcpStream;
 use std::os::windows::io::{FromRawSocket, RawSocket};
 use std::sync::OnceLock;
 use windows_sys::core::GUID;
+use windows_sys::Win32::Devices::Bluetooth::{AF_BTH, BTHPROTO_RFCOMM, SOCKADDR_BTH};
 use windows_sys::Win32::Networking::WinSock::{
-    accept, bind, closesocket, connect, listen, socket, WSAGetLastError, WSAStartup, AF_BTH,
-    BTHPROTO_RFCOMM, INVALID_SOCKET, SOCKADDR, SOCKADDR_BTH, SOCK_STREAM, SOCKET, SOCKET_ERROR,
-    WSADATA,
+    accept, bind, closesocket, connect, listen, socket, WSAGetLastError, WSAStartup,
+    INVALID_SOCKET, SOCKADDR, SOCK_STREAM, SOCKET, SOCKET_ERROR, WSADATA,
 };
 
 static WSA_STARTUP_RESULT: OnceLock<io::Result<()>> = OnceLock::new();
@@ -147,7 +147,7 @@ pub async fn connect_windows_rfcomm(
             "missing channel or uuid for windows rfcomm".to_string(),
         ));
     }
-    let socket = unsafe { socket(AF_BTH, SOCK_STREAM, BTHPROTO_RFCOMM) };
+    let socket = unsafe { socket(AF_BTH as i32, SOCK_STREAM as i32, BTHPROTO_RFCOMM as i32) };
     if socket == INVALID_SOCKET {
         return Err(last_socket_error());
     }
@@ -168,7 +168,7 @@ pub async fn connect_windows_rfcomm(
 
 pub async fn accept_windows_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtLink> {
     ensure_wsa()?;
-    let socket = unsafe { socket(AF_BTH, SOCK_STREAM, BTHPROTO_RFCOMM) };
+    let socket = unsafe { socket(AF_BTH as i32, SOCK_STREAM as i32, BTHPROTO_RFCOMM as i32) };
     if socket == INVALID_SOCKET {
         return Err(last_socket_error());
     }
