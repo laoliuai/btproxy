@@ -111,7 +111,11 @@ Start btproxy-client on Windows:
 ### Building
 
 ```bash
+# for linux if you are using ubuntu
 cargo build --release
+
+# for windows
+cargo build --release --target x86_64-pc-windows-gnu
 ```
 
 ### Configure Browser/Client
