@@ -1,7 +1,8 @@
 # btproxy Rust 仓库骨架 + 关键文件清单 + 模块 TODO（给 Codex 直接开工）
 
 > 目标：一键生成可编译的 workspace 骨架，并按 TODO 分解逐步补齐功能。  
-> MVP：Windows client + Ubuntu server；RFCOMM 单链路 + 自定义 MUX；A 本地 HTTP 代理（CONNECT + http）；B 侧 SOCKS5 出口到 Clash。
+> MVP：Windows/Ubuntu client + Windows/Ubuntu server；RFCOMM 单链路 + 自定义 MUX；A 本地 HTTP 代理（CONNECT + http）；B 侧可配置为 SOCKS5 出口到 Clash 或 direct。  
+> 默认假设配对后的 client/server 彼此可信（两端对彼此拥有完全访问权限），PSK 仅作为可选增强。
 
 ---
 
@@ -90,7 +91,7 @@ btproxy/
 ### 1.2 `README.md`（用户使用说明）
 内容建议：
 - 项目简介（显式 HTTP 代理 + RFCOMM + Clash）
-- 快速开始（Windows client / Ubuntu server）
+- 快速开始（Windows/Ubuntu client / Windows/Ubuntu server）
 - WSL 使用方式（设置 http_proxy/https_proxy）
 - 常见问题（断连、重连、端口占用）
 
@@ -146,6 +147,8 @@ pub async fn connect_windows_rfcomm(
   cfg: BtLinkConfig
 ) -> Result<BtLink>;
 
+pub async fn accept_windows_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtLink>;
+
 pub async fn accept_linux_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtLink>;
 ```
 
@@ -161,6 +164,8 @@ pub async fn accept_linux_rfcomm(channel: u8, cfg: BtLinkConfig) -> Result<BtLin
   -  若提供 UUID：通过系统 SDP（或 connect 结构）让其自动选 channel（能做到最好；做不到先要求 channel）
   -  支持 `--channel` fallback（直连）
   -  返回一个实现 `Read+Write` 的 socket handle，并交给 `BtLink::spawn(...)`
+-  Windows：实现 `accept_windows_rfcomm`
+  -  绑定/监听指定 channel（如系统限制则通过 SDP 注册 + 自动分配）
 -  Linux：实现 `accept_linux_rfcomm`
   -  socket/bind/listen/accept
   -  支持只 accept 一个连接（MVP）
@@ -322,8 +327,8 @@ pub struct MuxStream {
 
 ---
 
-### 3.2 `apps/btproxy-server`（Ubuntu）
-**职责**：解析 CLI → init logging → accept RFCOMM → MuxSession(server role) → on_open 建立 outbound（Clash SOCKS）
+### 3.2 `apps/btproxy-server`（Windows/Ubuntu）
+**职责**：解析 CLI → init logging → accept RFCOMM → MuxSession(server role) → on_open 建立 outbound（Clash SOCKS 或 direct）
 
 **main.rs TODO**
 -  CLI（clap）参数：
@@ -334,11 +339,11 @@ pub struct MuxStream {
   -  `--sdp-external`（可选，先打印提示/或执行外部命令）
   -  `--log`
 -  init tracing
--  RFCOMM accept：
+  -  RFCOMM accept：
   -  accept 一个连接 -> start MuxSession(role=server)
--  on_open hook：
+  -  on_open hook：
   -  收到 OPEN(host,port)：
-    -  `socks5::connect(proxy=clash_socks, target=host:port, auth=...)`
+    -  根据配置：`socks5::connect(proxy=clash_socks, target=host:port, auth=...)` 或 direct TCP connect
     -  成功 -> OPEN_OK 并启动 stream<->tcp 双向 copy
     -  失败 -> OPEN_ERR 并关闭 stream
 -  单 client 策略：
@@ -406,6 +411,7 @@ pub trait OpenHandler: Send + Sync + 'static {
 ### Milestone 4：替换为 RFCOMM（Windows + Ubuntu）
 -  linux rfcomm accept
 -  windows rfcomm connect（先要求用户提供 channel）
+-  windows rfcomm accept（server 端）
 -  跑通 CONNECT
 -  再补 SDP/UUID 自动发现（若可行）
 
@@ -467,6 +473,7 @@ pub trait OpenHandler: Send + Sync + 'static {
 ### btlink
 -  linux rfcomm accept
 -  windows rfcomm connect (channel required first)
+-  windows rfcomm accept (server)
 -  tcp transport (dev mode)
 
 ### mux
@@ -490,5 +497,5 @@ pub trait OpenHandler: Send + Sync + 'static {
 
 ### apps
 -  client reconnect loop + session provider
--  server on_open -> socks5 -> bidirectional copy
+-  server on_open -> socks5/direct -> bidirectional copy
 -  docs & examples

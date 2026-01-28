@@ -2,8 +2,8 @@
 
 版本：v0.1
 目标平台：
-- **Client**：Windows（宿主机运行；WSL 通过 Windows 的本地代理使用）or Ubuntu
-- **Server**：Windows or Ubuntu（BlueZ）
+- **Client**：Windows（宿主机运行；WSL 通过 Windows 的本地代理使用）或 Ubuntu
+- **Server**：Windows 或 Ubuntu（Linux 使用 BlueZ；Windows 使用系统蓝牙栈）
 - 未来：macOS（预留接口，不在 v0.1 强制实现）
 
 ---
@@ -28,7 +28,7 @@
    - `CONNECT host:port`（HTTPS 隧道）
    - 普通 `http://...` 代理请求（绝对 URI 请求行）
 2. A↔B 使用 RFCOMM 单连接承载多路逻辑流（每个代理连接对应一个逻辑 stream）
-3. B 对每个 stream，通过 Clash 的 SOCKS5（推荐 7891）建立到目标 `host:port` 的 TCP 连接
+3. B 对每个 stream，根据配置通过 Clash 的 SOCKS5（推荐 7891）或 direct 建立到目标 `host:port` 的 TCP 连接
 4. 双向转发 DATA、支持并发、具备背压、可重连
 5. WSL 可用：WSL 设置代理指向 Windows 本地端口即可
 
@@ -236,10 +236,9 @@ CLI：
 - 双向转发 DATA
 - 可选：注册 SDP 服务（方便 Windows 通过 UUID 自动发现 channel）
 
-### 5.2 RFCOMM 监听（windows or Ubuntu/BlueZ）
-- `socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)`
-- bind：`BDADDR_ANY` + `channel`
-- listen/accept
+### 5.2 RFCOMM 监听（Windows or Ubuntu/BlueZ）
+- Linux：`socket(AF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)` + bind `BDADDR_ANY` + channel + listen/accept
+- Windows：Winsock `AF_BTH / SOCK_STREAM / BTHPROTO_RFCOMM` 绑定并监听指定 channel（如系统不支持绑定 channel，则采用 SDP 注册 + 由系统分配）
 
 v0.1 仅支持单 client 连接；新连接策略：
 - 默认拒绝新连接（默认行为，根据配置文件，也可踢掉旧连接切换到新连接，二选一）
@@ -321,6 +320,7 @@ v0.1 仅支持单 client 连接；新连接策略：
 
 - client 的本地代理默认仅监听 `127.0.0.1`
 - server 连接 Clash 默认仅连 `127.0.0.1`
+- 默认假设 client/server 主机之间是可信的（两端对彼此拥有完全访问权限），无需额外鉴权
 - 可选 `--psk`：避免非本程序连接（即便蓝牙已配对）
 - v0.2 可加目的地限制（deny RFC1918 等）
 
@@ -443,7 +443,8 @@ struct BtLink {
 ## 14. 兼容性与使用体验
 ### 14.1 配对与首次使用
 
-+ 使用系统 UI/命令完成 Windows 与 Ubuntu 蓝牙配对（一次）
++ 使用系统 UI/命令完成 Windows 与 Ubuntu 的蓝牙配对（一次），并优先走 SPP UUID 自动发现
++ 提供设备列表与按名称连接的入口（Windows：已配对设备枚举；Linux：可配合 bluetoothctl）
 
 + B 启动 server（固定 channel）
 
@@ -496,7 +497,7 @@ export https_proxy=http://127.0.0.1:18080
 
 ## 16. 迭代路线图
 
-+ v0.1：Windows client + Ubuntu server，固定 channel，Clash SOCKS 出口，HTTP proxy(CONNECT + http close)
++ v0.1：Windows/Ubuntu client + Windows/Ubuntu server，固定 channel，Clash SOCKS/Direct 出口，HTTP proxy(CONNECT + http close)
 
 + v0.2：Ubuntu 原生 SDP 注册（BlueZ D-Bus），Windows 设备枚举/按名连接
 
@@ -506,7 +507,7 @@ export https_proxy=http://127.0.0.1:18080
 
 ## 17. 交付物清单
 
-1. btproxy-client（Windows）
+1. btproxy-client（Windows/Ubuntu）
 
     + 本地 HTTP 代理
 
@@ -514,11 +515,11 @@ export https_proxy=http://127.0.0.1:18080
 
     + WSL 使用说明
 
-2. btproxy-server（Ubuntu）
+2. btproxy-server（Windows/Ubuntu）
 
     + RFCOMM 监听
 
-    + MUX + per-stream outbound via SOCKS5 to Clash
+    + MUX + per-stream outbound via SOCKS5 to Clash 或 direct
 
 3. 文档：
 
