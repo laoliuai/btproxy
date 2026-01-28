@@ -2,6 +2,7 @@ use bytes::Bytes;
 use common::error::{BtProxyError, Result};
 use std::fs::File;
 use std::io::{Read, Write};
+use std::net::TcpStream;
 use std::thread;
 use tokio::sync::mpsc;
 use tracing::debug;
@@ -27,7 +28,10 @@ pub struct BtLink {
 }
 
 impl BtLink {
-    pub fn spawn(stream: File, cfg: BtLinkConfig) -> Result<Self> {
+    pub fn spawn<S>(stream: S, cfg: BtLinkConfig) -> Result<Self>
+    where
+        S: BtStream,
+    {
         let mut reader = stream.try_clone()?;
         let mut writer = stream;
         let (tx_outgoing, mut rx_outgoing) = mpsc::channel::<Bytes>(cfg.queue_bound);
@@ -73,6 +77,24 @@ impl BtLink {
             tx: tx_outgoing,
             rx: rx_incoming,
         })
+    }
+}
+
+pub trait BtStream: Read + Write + Send + 'static {
+    fn try_clone(&self) -> Result<Self>
+    where
+        Self: Sized;
+}
+
+impl BtStream for File {
+    fn try_clone(&self) -> Result<Self> {
+        Ok(self.try_clone()?)
+    }
+}
+
+impl BtStream for TcpStream {
+    fn try_clone(&self) -> Result<Self> {
+        Ok(self.try_clone()?)
     }
 }
 
