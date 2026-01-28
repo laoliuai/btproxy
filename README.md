@@ -40,16 +40,57 @@ btproxy creates a secure tunnel between Windows client and Ubuntu server via Blu
 - Bluetooth support on both machines
 - Clash proxy running on Ubuntu server
 
-### Building
+### Build & Deploy (构建与部署)
+
+#### 1) Ubuntu Server (Linux) 依赖与服务
+
+Install Bluetooth utilities and start the daemon:
 
 ```bash
-cargo build --release
+sudo apt install -y bluez bluez-tools
+sudo systemctl enable --now bluetooth
+sudo rfkill unblock bluetooth
 ```
 
-### Ubuntu Server Setup
+Get the server Bluetooth address (used by the Windows client as `--bt-addr`):
 
 ```bash
-# Start btproxy-server
+bluetoothctl show
+```
+
+#### 2) 蓝牙配对与信任 (Ubuntu ↔ Windows)
+
+On Ubuntu (server), pair and trust the Windows client:
+
+```bash
+bluetoothctl
+power on
+agent on
+default-agent
+discoverable on
+scan on            # find Windows address (AA:BB:CC:DD:EE:FF)
+pair AA:BB:CC:DD:EE:FF
+trust AA:BB:CC:DD:EE:FF
+connect AA:BB:CC:DD:EE:FF
+quit
+```
+
+On Windows, open **Settings → Bluetooth & devices**, add the Ubuntu device, and complete pairing.
+
+#### 3) RFCOMM Channel (可选但推荐)
+
+btproxy uses a fixed RFCOMM channel. Ensure both sides match the same `--channel` value (e.g. 22).
+On Ubuntu, you can advertise the RFCOMM service channel so Windows can find it more easily:
+
+```bash
+sudo sdptool add --channel=22 SP
+```
+
+#### 4) 启动服务
+
+Start btproxy-server on Ubuntu:
+
+```bash
 ./target/release/btproxy-server \
     --channel 22 \
     --clash-socks 127.0.0.1:7891 \
@@ -57,15 +98,20 @@ cargo build --release
     [--clash-pass pass]
 ```
 
-### Windows Client Setup
+Start btproxy-client on Windows:
 
 ```bash
-# Start btproxy-client
 ./target/release/btproxy-client \
     --listen 127.0.0.1:18080 \
     --bt-addr AA:BB:CC:DD:EE:FF \
     --uuid 00001101-0000-1000-8000-00805F9B34FB \
     [--channel 22]
+```
+
+### Building
+
+```bash
+cargo build --release
 ```
 
 ### Configure Browser/Client
