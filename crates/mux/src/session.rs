@@ -234,8 +234,14 @@ impl MuxSession {
                 self.inner.outgoing.clone(),
                 rx_stream,
             )),
-            Ok(Err(err)) => Err(err),
-            Err(_) => Err(BtProxyError::Protocol("open canceled".to_string())),
+            Ok(Err(err)) => {
+                self.inner.streams.lock().await.remove(&stream_id);
+                Err(err)
+            }
+            Err(_) => {
+                self.inner.streams.lock().await.remove(&stream_id);
+                Err(BtProxyError::Protocol("open canceled".to_string()))
+            }
         }
     }
 
@@ -253,6 +259,8 @@ impl MuxSession {
     }
 
     pub async fn send_open_err(&self, stream_id: u32, code: u16, message: &str) -> Result<()> {
+        self.inner.streams.lock().await.remove(&stream_id);
+        self.inner.pending.lock().await.remove(&stream_id);
         self.inner
             .outgoing
             .send(Frame::OpenErr {
@@ -262,5 +270,15 @@ impl MuxSession {
             })
             .await
             .map_err(|_| BtProxyError::Protocol("open err send failed".to_string()))
+    }
+
+    pub async fn send_rst(&self, stream_id: u32, code: u16) -> Result<()> {
+        self.inner.streams.lock().await.remove(&stream_id);
+        self.inner.pending.lock().await.remove(&stream_id);
+        self.inner
+            .outgoing
+            .send(Frame::Rst { stream_id, code })
+            .await
+            .map_err(|_| BtProxyError::Protocol("rst send failed".to_string()))
     }
 }

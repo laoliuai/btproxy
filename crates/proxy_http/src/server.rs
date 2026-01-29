@@ -140,6 +140,7 @@ async fn tunnel(client: TcpStream, mux_stream: MuxStream) -> Result<()> {
         while let Some(chunk) = inbound.recv_data().await {
             client_write.write_all(&chunk).await?;
         }
+        let _ = client_write.shutdown().await;
         Ok::<(), BtProxyError>(())
     });
 
@@ -173,6 +174,7 @@ async fn forward_body(client: TcpStream, mux_stream: MuxStream) -> Result<()> {
         while let Some(chunk) = inbound.recv_data().await {
             client_write.write_all(&chunk).await?;
         }
+        let _ = client_write.shutdown().await;
         Ok::<(), BtProxyError>(())
     });
 
