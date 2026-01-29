@@ -69,7 +69,7 @@ async fn handle_stream(
         "opening outbound connection"
     );
     let outbound = if cfg.direct {
-        TcpStream::connect(format!("{}:{}", host, port)).await?
+        TcpStream::connect(format!("{}:{}", host, port)).await
     } else {
         connect_via_socks5(
             &cfg.clash_socks,
@@ -78,12 +78,25 @@ async fn handle_stream(
             &host,
             port,
         )
-        .await?
+        .await
+    };
+
+    let outbound = match outbound {
+        Ok(stream) => stream,
+        Err(err) => {
+            let _ = session
+                .send_open_err(mux_stream.stream_id, 500, "connect failed")
+                .await;
+            return Err(err);
+        }
     };
 
     session.send_open_ok(mux_stream.stream_id).await.ok();
     info!(stream_id = mux_stream.stream_id, "proxying stream");
-    proxy_streams(outbound, mux_stream).await?;
+    if let Err(err) = proxy_streams(outbound, mux_stream.clone()).await {
+        let _ = session.send_rst(mux_stream.stream_id, 500).await;
+        return Err(err);
+    }
     Ok(())
 }
 
@@ -103,6 +116,7 @@ async fn proxy_streams(outbound: TcpStream, mux_stream: mux::MuxStream) -> Resul
         while let Some(chunk) = inbound.recv_data().await {
             outbound_write.write_all(&chunk).await?;
         }
+        let _ = outbound_write.shutdown().await;
         Ok::<(), anyhow::Error>(())
     });
 
