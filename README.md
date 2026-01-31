@@ -2,6 +2,8 @@
 
 Bluetooth RFCOMM tunnel with HTTP proxy for bypassing network restrictions.
 
+> 说人话：希望在某些无法通过代理工具使用vibe coding的场景下，提供一条绕过网络限制的路径，使vibe coding工具能够正常使用。
+
 ## Overview
 
 btproxy creates a secure tunnel between Windows client and Ubuntu server via Bluetooth Classic RFCOMM, routing through Clash proxy. It provides an explicit HTTP proxy that can be used by browsers or command-line tools.
